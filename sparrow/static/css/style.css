@@ -1,0 +1,120 @@
+body {
+    font-family:Arial, Helvetica, sans-serif;
+}
+.handler-bg {
+    background-color:#faf6d0;
+}
+.researcher-bg {
+    background-color:#d0f6fa;
+}
+div { 
+    background-color:none;
+}
+#results{
+    clear:right;width:1000px;min-width:800px;margin:20px 20px;padding:10px;border-radius:10px;
+}
+.user_speech{
+    float:right;clear:left;background-color:#d9fdd3;border-radius:5px;margin:0px 0px 10px 100px;padding:15px;
+}
+.agent_speech{
+    float:left;clear:both;border-radius:5px;margin:0px 100px 5px 0px;padding:15px 15px 15px 0px;break-after:always;
+}
+.agent_chart{
+    float:left;clear:both;background-color:white;border-radius:5px;margin:10px 100px 10px 0px;width:800px;height:300px;
+}    
+.attendee {
+    display:inline-block;margin-left:20px;vertical-align:middle;
+}
+.attendee input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    vertical-align:middle;
+}
+#task{
+    width:100%;border:0;border-radius:10px;
+}
+.arrow{
+    height:50px;vertical-align:top;margin-top:7px;
+}
+.arrow:hover{
+    opacity:50%
+}
+img{
+    height:20px;
+}
+.ls-header {
+    font-family: arial;
+    font-size: 1.3em;
+    margin: 5px 5px 15px 35px;
+    padding: 30px 0 15px 0;
+}
+.ls-header-title {    
+    float: left;
+    margin-right: 10px;
+    border-radius: 5px;
+    height: 30px;
+    width: 30px;
+    background-size: cover;
+}
+.ls-header-link {
+    color:black;
+    font-size:1.3em;
+    text-decoration:none;
+}
+.ls-header-subtitle {
+
+}
+#div-menu {
+    margin-left:30px;
+}
+#div-menu {
+    margin-left:30px;
+}
+.menu-tab {
+    margin-right:10px;
+    background-color:rgba(0,0,0,0.5);
+    border-radius:5px;
+    padding:5px 7px;
+    text-decoration:none;
+    color:white;
+}
+.menu-tab:hover {
+    background-color:rgba(0,0,0,0.8);
+}
+@media only screen and (orientation: landscape) and (max-device-height: 480px) {
+    .user_speech, .agent_speech{
+        font-size:x-large;margin-right:40px;
+    }
+    .attendee {
+        font-size:x-large;
+    }
+    .attendee input[type="checkbox"] {
+        width:30px;
+        height:30px;
+    }
+}
+@media only screen and (orientation: portrait) and (max-device-width: 480px) {
+    #results{
+        width:100%;min-width:0px;
+    }
+    .user_speech, .agent_speech{
+        font-size:xx-large;margin:0px 0px 0px 0px;
+    }
+    .attendee {
+        font-size:xx-large;display:block;
+    }
+    .attendee input[type="checkbox"] {
+        width:40px;
+        height:40px;
+    }
+    .ls-header {
+        font-size:2.5em;
+    }
+    .ls-header-title {    
+        height:60px;
+        width:60px;
+    }    
+    .menu-tab {
+        font-size:2em;
+    }
+}    

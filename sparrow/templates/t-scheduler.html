@@ -1,0 +1,247 @@
+{% extends 't-base.html' %}
+
+{% block content %}
+
+    <div id="results">
+
+        <table style="width:100%;">
+            <tr>
+                <td>
+                    <div id="history">
+                        <div style="margin-right:5px;" class="agent_speech"">Populate the fields and click on a day for available appointments.</div>
+                    </div>
+                </td>
+                <td rowspan="6" style="width:50%">
+                    <div id="calendar" style="width:100%"></div>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Name: <input id="name" value="Sandra Mason">
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Address: <input type="text" id="address" placeholder="Enter address" style="width:300px"/>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <!-- <input type="hidden" id="requested_date" value="" name="requested_date" min="2025-01-01" max="2025-12-31"> -->
+                    Duration: <select id="requested_duration">
+                                <option>30</option>
+                                <option>45</option>
+                                <option>60</option>
+                        </select> minutes
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <!-- <div style="max-width:200px;" class="arrow" onclick="getSlots()">
+                        Show available slots
+                        <img src="/static/img/arrow.jpg"/>
+                    </div> -->
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <div style="max-width:200px;" class="arrow" onclick="showMap()">
+                        <br>
+                        Show route map
+                        <img src="/static/img/arrow.jpg"/>
+                    </div>
+                </td>          
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <br/>
+                    <div id="map" style="height:500px;width:100%"></div>
+                </td>          
+            </tr>
+        </table>
+            
+    </div>
+  
+    <script src="https://maps.googleapis.com/maps/api/js?key={{API_KEY}}&libraries=geometry,places&callback=initFields" async defer></script>
+    <!-- <script src="https://maps.googleapis.com/maps/api/js?key={{API_KEY}}&libraries=geometry,places" async defer></script> -->
+    <!-- <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css' rel='stylesheet'/> -->
+    <script src='/static/js/fullcalendar.min.js'></script>
+  
+    <script>
+
+        const nameInput = document.getElementById('name');
+        const addressInput = document.getElementById('address');
+        const dateInput = document.getElementById('requested_date');
+        const durationInput = document.getElementById('requested_duration');
+
+        function initFields() {
+            window.selected_date = new Date().toISOString().slice(0, 10);
+            addressInput.value = "575 St Clarens Ave, Toronto, ON"             
+            google.maps.event.addDomListener(window, 'load', initAutocomplete);
+            showCalendar([]);
+        }
+
+        const calendarEl = document.getElementById('calendar');
+        var calendar;
+
+        function showCalendar(slots) {
+
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                height: 200,
+                initialView: 'dayGridWeek',
+                weekends: false,
+                selectable: true,
+                events: [],      
+                eventClick: function(info) {
+                    
+                    info.el.style.border = '2px solid red';
+                    start_time_st = info.event.start.toISOString().slice(0, -5).replace('T', ' ');
+
+                    var url = "/scheduler-save-slot?start_time=" + start_time_st + 
+                        "&duration=" + durationInput.value + 
+                        "&name=" + nameInput.value + 
+                        "&address=" + addressInput.value;
+
+                    axios.get(url)
+                    .then( response => {                        
+                        date_st = start_time_st.slice(0, 10);
+                        showMap(date_st);
+                    });
+                },
+                select: function(selectionInfo) {                    
+                    getSlots(selectionInfo.startStr);
+                    // calendar.unselect();
+                    window.selected_date = selectionInfo.startStr;
+                }
+            });
+
+            // for(slot of slots) {
+            //     calendar.addEvent({
+            //         title: '',
+            //         start: slot.start_time,
+            //         end: slot.end_time,
+            //         allDay: false
+            //     });
+            // };
+
+            calendar.render();
+        }
+
+        async function getSlots(date_st) {
+
+            // console.log(theDate, dateInput.value);
+            // if ( theDate == null ) { theDate = dateInput.value }
+            // console.log("date_st=" + date_st);
+            // timestamp = Date.parse(date_st);
+
+            the_date = new Date(date_st + 'T00:00:00').getTime();
+            // console.log("the_date=" + the_date);
+
+            today = new Date().setHours(0,0,0,0);
+            // console.log("today=" + today);
+
+            if ( the_date < today ) { 
+                console.log("Nothing available in the past." );
+                return; 
+            }
+
+            var url = "/scheduler-slots?date=" + date_st + "&duration=" + durationInput.value + "&name=" + nameInput.value + "&address=" + addressInput.value;
+            axios.get(url)
+            .then( function (response) {
+                var data = response.data;
+                // console.dir(data);
+                // showCalendar(data.slots)
+                for(slot of data.slots) {
+                    calendar.addEvent({
+                        title: '',
+                        start: slot.start_time,
+                        end: slot.end_time,
+                        allDay: false
+                    });
+                };
+            });
+        }
+
+        async function showMap(the_date) {
+
+            if ( the_date == null) {
+                the_date = window.selected_date
+            }
+
+            // var url = "/scheduler-directions?date=" + dateInput.value;
+            var url = "/scheduler-directions?date=" + the_date;
+
+            console.log(url);
+
+            axios.get(url)
+            .then( function (response) {
+
+                var data = response.data;
+                console.dir(data);
+
+                var encodedPolyline = data.routes[0].polyline.encodedPolyline
+
+                // Decode the encoded polyline into an array of LatLng
+                var decodedPath = google.maps.geometry.encoding.decodePath(encodedPolyline);
+
+                // Create the map centered on the first point in the polyline
+                var map = new google.maps.Map(document.getElementById('map'), {
+                    zoom: 14,
+                    center: decodedPath[0]
+                });
+
+                console.log(map);
+
+                // Create a polyline and set its path to the decoded polyline points
+                var routePolyline = new google.maps.Polyline({
+                    path: decodedPath,
+                    geodesic: true,
+                    strokeColor: '#FF0000',
+                    strokeOpacity: 1.0,
+                    strokeWeight: 4
+                });
+
+                // Add the polyline to the map
+                routePolyline.setMap(map);
+
+                // Add markers          // const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
+                if ( data.routes.length > 0 ) {
+                    data.routes[0].legs.forEach(function(leg) {
+                        console.log('marker');
+                        var endMarker = new google.maps.Marker({
+                            position: { lat: leg.endLocation.latLng.latitude, lng: leg.endLocation.latLng.longitude },
+                            map: map,
+                            label: {
+                                text: ('' + (data.routes[0].legs.indexOf(leg)+1) + ') ' + 
+                                    leg.endLocation.nad[0] + ', ' ).replace('End, ', '') + 
+                                    leg.endLocation.nad[1].replace(', Toronto, ON', ''),
+                                color: "black",
+                                fontSize: "15px",
+                                fontWeight: "bold"
+                            }
+                        });
+                    });
+                }
+            });
+        }
+
+        function initAutocomplete() {
+            const input = document.getElementById('address');
+            const autocomplete = new google.maps.places.Autocomplete(address);
+            autocomplete.setFields(['address_components', 'geometry', 'formatted_address']);
+            autocomplete.addListener('place_changed', () => {
+                const place = autocomplete.getPlace();
+                if (!place.geometry) {
+                    alert("No details for input");
+                    return;
+                }
+                console.log(place.formatted_address);
+            });
+        }
+
+    </script>
+  
+{% endblock %}
+
+
+

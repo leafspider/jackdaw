@@ -1,0 +1,189 @@
+{% extends 't-base.html' %}
+
+{% block content %}
+
+        <div id="results">
+            <table style="width:100%;">
+                <tr>
+                    <td colspan="2">
+                        <div id="history">
+                            <div class="agent_speech"">Hello I'm the Researcher. I use reasoning to provide informed responses. What can I do for you?</div>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <textarea autofocus name="task" id="task" rows="5" onkeypress="clickPress(event)" placeholder="Type a request">Chart the top 3 contributors to NATO per capita in 2023.</textarea>
+                    </td>
+                    <td style="width:1%;padding-left:20px">
+                        <select id="model" style="font-size:1.1em;display:none">
+                            <option>Anthropic</option>
+                            <option selected>Cohere</option>
+                            <option>Fireworks</option>
+                        </select><br>
+                        <img class="arrow" src="/static/img/arrow.jpg" onclick="doTask()"/>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <script>
+
+            function clickPress(event) {
+                if (event.key == "Enter") { doTask(); }
+            }
+
+            function doTask() {
+                var task = document.getElementById('task').value
+                if ( task.trim() != '' ) {
+                    var div = document.createElement('div');
+                    div.classList.add('user_speech');
+                    div.append(task);
+                    document.getElementById('history').appendChild(div);
+                    window.scrollTo(0, document.body.scrollHeight);
+                    if ( task == 'test') { test(); }
+                    else { getData(task); }
+                    document.getElementById('task').value = '';
+                }
+            }
+
+            function extractJson(str) {
+                var json = null;
+                text = null;
+                if (typeof str == "string" ) {
+                    var pos1 = str.indexOf("{");
+                    var pos2 = str.lastIndexOf("}");
+                    if ( pos1 > -1 && pos2 > pos1 ) {
+                        var subst = str.substring(pos1, pos2+1);
+                        subst = subst.replaceAll("$", "");
+                        json = JSON.parse(subst);
+                        text = str.substring(0, pos1) + " " + str.substring(pos2+1)
+                    }
+                    else { text = str; }
+                    text = text.replaceAll("\n\n", "<br/>").trim();
+                }
+                else { json = str; }
+                return [json, text];
+            }
+
+            function addEllipsis() {
+                var div = document.createElement('div');
+                div.id = "ellipsis";
+                div.classList.add('agent_speech');
+                var img = document.createElement('img');
+                img.src = "/static/img/ellipsis.gif";
+                div.appendChild(img);
+                document.getElementById('history').appendChild(div);
+            }
+
+            function removeEllipsis() {
+                document.getElementById("ellipsis").remove();
+            }
+
+            function getData( task ) {
+
+                addEllipsis();
+
+                var model = document.getElementById('model').value;
+                var url = "/invoke?model=" + model + "&task=" + task;
+                console.log( 'url='+ url );
+
+                axios.get(url)
+                .then( function (response) {
+
+                    var data = response.data;
+                    console.log(data);
+
+                    var res = extractJson(data);
+
+                    var json = res[0];
+                    if ( json != null ) {
+                        var jid = 'chart' + Math.random();
+                        var jdiv = document.createElement('div');
+                        jdiv.id = jid;
+                        jdiv.classList.add('agent_chart');
+                        document.getElementById('history').appendChild(jdiv);
+                        Highcharts.chart(jid, json);
+                    }
+
+                    var text = res[1];
+                    if ( text != null ) {
+                        var id = 'speech' + Math.random();
+                        var div = document.createElement('div');
+                        div.id = id;
+                        div.classList.add('agent_speech');
+                        div.innerHTML = text;
+                        document.getElementById('history').appendChild(div);
+                    }
+
+                    removeEllipsis();
+                })
+                .then( function (response) {
+                    //document.getElementById('task').value = ''
+                    window.scrollTo(0, document.body.scrollHeight);
+                })
+                .catch(function (error) {
+                    removeEllipsis();
+                    console.log(error); }
+                )
+            }
+
+            function test() {
+                const txt = `Use the following JSON format for highcharts.js to create a column chart:
+                    {
+                      "chart": {
+                        "type": "scatter"
+                      },
+                      "title": {
+                        "text": "GDP per Capita vs. Population in 2023"
+                      },
+                      "xAxis": {
+                        "categories": ["United States", "China", "Japan"]
+                      },
+                      "yAxis": {
+                        "title": {
+                          "text": "GDP per Capita (current USD)"
+                        }
+                      },
+                      "series": [
+                        {
+                          "name": "GDP per Capita",
+                          "data": [68309, 12556, 39293]
+                        },
+                        {
+                          "name": "Population (millions)",
+                          "data": [336, 1426, 126],
+                          "tooltip": {
+                            "valueSuffix": " millions"
+                          }
+                        }
+                      ],
+                      "tooltip": {
+                        "shared": true
+                      },
+                      "legend": {
+                        "layout": "vertical",
+                        "align": "right",
+                        "verticalAlign": "top",
+                        "x": -100,
+                        "y": 100,
+                        "borderWidth": 0
+                      }
+                    }
+                    You can use this JSON format in your highcharts.js implementation to visualize the data.`
+
+                var res = extractJson(txt);
+                var json = res[0];
+                console.log(json);
+
+                var jid = 'chart' + Math.random();
+                var jdiv = document.createElement('div');
+                jdiv.id = jid;
+                jdiv.classList.add('agent_chart');
+                document.getElementById('history').appendChild(jdiv);
+                Highcharts.chart(jid, json);
+            }
+
+        </script>
+
+{% endblock %}

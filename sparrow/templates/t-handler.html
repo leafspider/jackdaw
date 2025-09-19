@@ -1,0 +1,438 @@
+{% extends 't-base.html' %}
+
+{% block content %}
+
+        <div id="results">
+            <table style="width:100%;">
+                <tr>
+                    <td cols="2">
+                        <div id="history">
+                            <div class="agent_speech">
+                                Hello I'm the Handler. I run silo-busting meetings between multiple agents. 
+                                Who shall I invite and what can we do for you?
+                            </div>
+                            <div class="agent_speech">
+                                Attendees:
+                                <div class="attendee"><input type="checkbox" name="agent" value="Operational"> Operational</div>
+                                <div class="attendee"><input type="checkbox" name="agent" value="Promotional"> Promotional</div>
+                                <div class="attendee"><input type="checkbox" name="agent" value="Financial"> Financial</div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding-top:20px;">
+                        <textarea autofocus name="task" id="task" rows="5" onkeypress="clickPress(event)" placeholder="Type a request">Why have our production costs increased by 5% per unit over the last month?</textarea>
+                    </td>
+                    <td style="width:1%;padding-left:20px">
+                        <img class="arrow" src="/static/img/arrow.jpg" onclick="doTask()"/>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <!--script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script-->
+
+        <script>            
+
+            $(document).ready(function() {
+                $('input[type="checkbox"]').on('change', function() {
+                    if ($('input[type="checkbox"]:checked').length > 2) {
+                        $(this).prop('checked', false);
+                        alert('You can only select up to 2 options.');
+                    }
+                });
+            });
+
+            function clickPress(event) {
+                if (event.key == "Enter") { doTask(); }
+            }
+
+            function doTask() {
+                
+                var task = document.getElementById('task').value
+                if ( task.trim() != '' ) {
+                    var div = document.createElement('div');
+                    div.classList.add('user_speech');
+                    div.append(task);
+                    document.getElementById('history').appendChild(div);
+                    window.scrollTo(0, document.body.scrollHeight);
+                    if ( task == 'test') { test(); }
+                    else { getData(task); }
+                    document.getElementById('task').value = '';
+                }
+            }
+
+            function extractJson(str) {
+                var json = null;
+                text = null;
+                if (typeof str == "string" ) {
+                    var pos1 = str.indexOf("{");
+                    var pos2 = str.lastIndexOf("}");
+                    if ( pos1 > -1 && pos2 > pos1 ) {
+                        var subst = str.substring(pos1, pos2+1);
+                        json = JSON.parse(subst);
+                        text = str.substring(0, pos1) + " " + str.substring(pos2+1)
+                    }
+                    else { text = str; }
+                    text = text.replaceAll("\n\n", "<br/>").trim();
+                }
+                else { json = str; }
+                return [json, text];
+            }
+
+            function addEllipsis() {
+                var div = document.createElement('div');
+                div.id = "ellipsis";
+                div.classList.add('agent_speech');
+                var img = document.createElement('img');
+                img.src = "/static/img/ellipsis.gif";
+                div.appendChild(img);
+                document.getElementById('history').appendChild(div);
+            }
+
+            function removeEllipsis() {
+                document.getElementById("ellipsis").remove();
+            }
+
+            flow_host = "{{flow_host}}";
+            if ( flow_host == "localhost" ) {
+                baseUrl = 'ws://{{flow_host}}:{{flow_port}}';
+            }
+            else {
+                baseUrl = 'wss://{{flow_host}}/ws';
+            }
+
+            async function getData(task) {
+                try {
+                    addEllipsis(); 
+
+                    flow = "meeting";
+                    // agents = ["Operational","Promotional"]
+                    agents = []
+                    $('input[type="checkbox"]:checked').each(function() {
+                        var value = $(this).val();
+                        agents.push(value);
+                    });
+                    const msg = {
+                        flow: flow,
+                        agents: agents,
+                        task: task
+                    };
+
+                    socket = openNewSocket(baseUrl, '', '');
+                    await waitForWebSocketConnection(socket).then(() => {
+                        console.log("Websocket connected");
+                        socket.send(JSON.stringify(msg));
+                    }).catch((error) => {
+                        console.error("Websocket failed to connect:", error);
+                    });                    
+                }
+                catch (error) {
+                    console.error('Websocket failed to connect:', error);
+                }
+            }
+            
+            function openNewSocket(baseURL, endpoint, queryParams) {
+
+                url = `${baseURL}${endpoint}?${new URLSearchParams(queryParams).toString()}`;                
+
+                socket = new WebSocket(url);
+
+                socket.onopen = function(event) { 
+                    console.log('Websocket opened');
+                };
+
+                socket.onmessage = function(response) {
+
+                    removeEllipsis();
+
+                    var data = response.data;
+                    console.log(data);
+
+                    var json = JSON.parse(data);
+
+                    colour = "none";
+                    if ( json != null ) {
+                        if ( json.name == "Operational") {
+                            colour = "#d3d9fd";
+                        }
+                        else if ( json.name == "Promotional") {
+                            colour = "#fdd3d9";
+                        }
+                        else if ( json.name == "Financial") {
+                            colour = "#f3cc97";
+                        }
+                    }
+
+                    var text = json.content;
+                    if ( text != null ) {
+                        var id = 'speech' + Math.random();
+                        var div = document.createElement('div');
+                        div.id = id;
+                        div.classList.add('agent_speech');
+                        div.innerHTML = text;
+                        div.style.backgroundColor = colour;
+                        document.getElementById('history').appendChild(div);
+                    }
+
+                    addEllipsis();                
+
+                    window.scrollTo(0, document.body.scrollHeight);
+                };
+
+                socket.onclose = function(event) { 
+                    removeEllipsis();
+                    console.log('Websocket closed'); 
+                };
+
+                socket.onerror = function(event) { 
+                    removeEllipsis();
+                    console.log('Websocket error'); 
+                };
+
+                return socket;
+            }
+           
+            async function waitForWebSocketConnection(socket) {                
+                return await new Promise((resolve, reject) => {
+                    const maxAttempts = 10;
+                    const intervalTime = 200; // ms
+                    let currentAttempt = 0;
+
+                    const interval = setInterval(() => {
+                        if (socket.readyState === WebSocket.OPEN) {
+                            clearInterval(interval);
+                            resolve();
+                        } 
+                        else if (currentAttempt > maxAttempts - 1) {
+                            clearInterval(interval);
+                            reject(new Error('Connection timed out'));
+                        } 
+                        else {
+                            currentAttempt++;
+                        }
+                    }, intervalTime);
+                });
+            }
+
+
+
+
+
+
+            async function obgetData( task ) {
+                console.log(task);
+                addEllipsis(); 
+                await newSocket( task );
+                console.log("Done");
+            }
+            
+            function obcreateWebSocketConnection(url) {
+
+                return new Promise((resolve, reject) => {
+                    
+                    const socket = new WebSocket(url);
+                    
+                    socket.onopen = function(event) { 
+                        console.log('Connected to WebSocket');
+                    };
+
+                    socket.onmessage = function(response) {
+
+                        removeEllipsis();
+
+                        var data = response.data;
+                        console.log(data);
+
+                        var res = extractJson(data);
+
+                        var json = res[0];
+                        if ( json != null ) {
+                            var jid = 'chart' + Math.random();
+                            var jdiv = document.createElement('div');
+                            jdiv.id = jid;
+                            jdiv.classList.add('agent_chart');
+                            document.getElementById('history').appendChild(jdiv);
+                            Highcharts.chart(jid, json);
+                        }
+
+                        var text = res[1];
+                        if ( text != null ) {
+                            var id = 'speech' + Math.random();
+                            var div = document.createElement('div');
+                            div.id = id;
+                            div.classList.add('agent_speech');
+                            div.innerHTML = text;
+                            document.getElementById('history').appendChild(div);
+                        }
+
+                        addEllipsis();                
+
+                        window.scrollTo(0, document.body.scrollHeight);
+                    };
+
+                    socket.onclose = function(event) { 
+                        removeEllipsis();
+                        console.log('Disconnected from WebSocket'); 
+                    };
+
+                    socket.onerror = function(event) { 
+                        removeEllipsis();
+                        console.log('Error in WebSocket'); 
+                    };
+                });
+            }
+
+            function obgetSocketConnection(url) {
+                    
+                const socket = new WebSocket(url);
+                
+                socket.onopen = function(event) { 
+                    console.log('Connected to WebSocket');
+                };
+
+                socket.onmessage = function(response) {
+
+                    removeEllipsis();
+
+                    var data = response.data;
+                    console.log(data);
+
+                    var res = extractJson(data);
+
+                    var json = res[0];
+                    if ( json != null ) {
+                        var jid = 'chart' + Math.random();
+                        var jdiv = document.createElement('div');
+                        jdiv.id = jid;
+                        jdiv.classList.add('agent_chart');
+                        document.getElementById('history').appendChild(jdiv);
+                        Highcharts.chart(jid, json);
+                    }
+
+                    var text = res[1];
+                    if ( text != null ) {
+                        var id = 'speech' + Math.random();
+                        var div = document.createElement('div');
+                        div.id = id;
+                        div.classList.add('agent_speech');
+                        div.innerHTML = text;
+                        document.getElementById('history').appendChild(div);
+                    }
+
+                    addEllipsis();                
+
+                    window.scrollTo(0, document.body.scrollHeight);
+                };
+
+                socket.onclose = function(event) { 
+                    removeEllipsis();
+                    console.log('Disconnected from WebSocket'); 
+                };
+
+                socket.onerror = function(event) { 
+                    removeEllipsis();
+                    console.log('Error in WebSocket'); 
+                };
+
+                return socket;
+            }
+
+            async function connectToWebSocket() {
+                try {
+                    return await createWebSocketConnection('ws://localhost:8765');
+                    //socket.send("Hello, server!");
+                } catch (error) {
+                    console.error("Failed to connect:", error);
+                }
+            }
+            
+            async function obnewSocket(task) {
+                
+                // if (socket && socket.readyState !== WebSocket.CLOSED) {
+                //     socket.close();
+                // }
+
+                // socket = new WebSocket('ws://localhost:8765');    
+                // socket = connectToWebSocket();
+                // const socket = createWebSocketConnection('ws://localhost:8765');
+                const socket = getSocketConnection('ws://localhost:8765');
+
+                num = 0;
+                while( socket.readyState != WebSocket.CONNECTED ) { 
+                    console.log('Connecting ' + num + ' ' + socket.readyState);
+                    num++
+                    if ( num > 20 ) { break; }
+                }
+
+                console.log('Sending ' + task);
+                socket.send( task );
+            }
+            
+            function test() {
+                const txt = `Use the following JSON format for highcharts.js to create a column chart:
+                    {
+                      "chart": {
+                        "type": "scatter"
+                      },
+                      "title": {
+                        "text": "GDP per Capita vs. Population in 2023"
+                      },
+                      "xAxis": {
+                        "categories": ["United States", "China", "Japan"]
+                      },
+                      "yAxis": {
+                        "title": {
+                          "text": "GDP per Capita (current USD)"
+                        }
+                      },
+                      "series": [
+                        {
+                          "name": "GDP per Capita",
+                          "data": [68309, 12556, 39293]
+                        },
+                        {
+                          "name": "Population (millions)",
+                          "data": [336, 1426, 126],
+                          "tooltip": {
+                            "valueSuffix": " millions"
+                          }
+                        }
+                      ],
+                      "tooltip": {
+                        "shared": true
+                      },
+                      "legend": {
+                        "layout": "vertical",
+                        "align": "right",
+                        "verticalAlign": "top",
+                        "x": -100,
+                        "y": 100,
+                        "borderWidth": 0
+                      }
+                    }
+                    You can use this JSON format in your highcharts.js implementation to visualize the data.`
+
+                var res = extractJson(txt);
+                var json = res[0];
+                console.log(json);
+
+                var id = 'speech' + Math.random();
+                var div = document.createElement('div');
+                div.id = id;
+                div.classList.add('agent_speech');
+                div.innerHTML = 'This is an awesome chart';
+                div.style.backgroundColor = 'none';
+                document.getElementById('history').appendChild(div);
+
+                var jid = 'chart' + Math.random();
+                var jdiv = document.createElement('div');
+                jdiv.id = jid;
+                jdiv.classList.add('agent_chart');
+                document.getElementById('history').appendChild(jdiv);
+                Highcharts.chart(jid, json);
+            }
+
+        </script>
+
+{% endblock %}
