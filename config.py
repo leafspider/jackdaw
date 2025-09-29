@@ -1,7 +1,4 @@
-# from dotenv import load_dotenv
+from dotenv import load_dotenv
 
-# print('running config.py')
-
-# load_dotenv(override=True)
-# load_dotenv()
+load_dotenv(override=True)
 

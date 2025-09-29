@@ -5,8 +5,8 @@ import multiprocessing
 import jackdaw.appointments.scheduler as sc
 import jackdaw.appointments.router as rt
 import jackdaw.appointments.slots as sl
-
 from datetime import date, datetime
+
 
 app = Flask(__name__)
 
