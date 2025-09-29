@@ -1,0 +1,261 @@
+{% extends 't-base.html' %}
+
+{% block content %}
+
+    <script src="https://maps.googleapis.com/maps/api/js?key={{API_KEY}}&libraries=geometry,places&callback=initFields" defer></script>
+    <!-- <script src="https://maps.googleapis.com/maps/api/js?key={{API_KEY}}&libraries=geometry,places" async defer></script> -->
+    <!-- <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css' rel='stylesheet'/> -->
+    <script src='/static/js/fullcalendar.min.js'></script>
+    <script src='/static/js/scheduler.js'></script>
+    <link href='/static/css/scheduler.css' rel='stylesheet'/>
+
+    <div id="results">
+
+        <table style="width:100%;">
+            <!-- <tr>
+                <td colspan="2">
+                    <div style="margin-right:5px;" class="agent_speech">Populate the fields and click on a day for available appointments.</div>
+                </td>
+            </tr> -->
+            <tr>
+                <td style="width:30px;">
+                    Name:
+                </td>
+                <td>
+                    <input id="name" value="Sandra Mason">
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Address:
+                </td>
+                <td>
+                    <input type="text" id="address" placeholder="Enter address" style="width:250px"/>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    Duration:
+                </td>
+                <td>
+                    <!-- <input type="hidden" id="requested_date" value="" name="requested_date" min="2025-01-01" max="2025-12-31"> -->
+                    <select id="requested_duration">
+                        <option></option>
+                        <option>30</option>
+                        <option>45</option>
+                        <option>60</option>
+                    </select> minutes
+                    <!-- <label class="custom-radio">
+                        <input type="radio" name="requested_duration" value="30">
+                        <span class="indicator"></span>
+                        30 mins
+                    </label> -->
+                </td>
+            </tr>
+        </table>
+
+        <table style="width:100%;">
+            <tr>
+                <td colspan="2">
+                    <div id="calendar" style="margin-top:20px;width:100%"></div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <div id="response" style="margin-top:10px;"></div>
+                </td>
+            </tr>
+        </table>
+            
+    </div>
+    
+    <dialog id="msgPopup">
+        <header>
+            <h2 id="popup-title"></h2>
+        </header>
+        <p id="popup-text"></p>
+    </dialog>
+
+    <dialog id="bookDialog">
+        <form method="dialog">
+            <header>
+                <h2 id="dialog-title"></h2>
+            </header>
+            <p id="dialog-text"></p>
+            <button value="ok">Yes</button>
+            <button value="cancel">No</button>
+            <span class="dialog-field" id="dialog-action"></span>
+            <span class="dialog-field" id="dialog-name"></span>
+            <span class="dialog-field" id="dialog-address"></span>            
+            <span class="dialog-field" id="dialog-start"></span>
+            <span class="dialog-field" id="dialog-duration"></span>
+        </form>
+    </dialog>
+
+    <script>
+        
+        const msgPopup = document.getElementById('msgPopup');
+        
+        const bookDialog = document.getElementById('bookDialog');
+        bookDialog.addEventListener('close', function() {
+            if (bookDialog.returnValue === 'ok') {               
+                
+                name = document.getElementById('dialog-name').textContent; 
+                address = document.getElementById('dialog-address').textContent; 
+                start_time_st = document.getElementById('dialog-start').textContent; 
+                duration = document.getElementById('dialog-duration').textContent;
+
+                action = document.getElementById('dialog-action').textContent;
+                console.log('dialog-action is', action);
+                if ( action == "Book" ) {
+                    document.getElementById('response').innerHTML = 'Updating...';                        
+                    var url = "/scheduler-save-slot?start_time=" + start_time_st + 
+                        "&duration=" + duration + 
+                        "&name=" + name + 
+                        "&address=" + address;
+
+                    axios.get(url)
+                    .then( response => { 
+                        date_st = start_time_st.slice(0, 10);
+                        removeEvents(date_st);
+                        getBookedSlots(date_st, name);
+                        document.getElementById('response').innerHTML = 'Your appointment is at ' + start_time_st.slice(11, 16);       
+                    });
+                }
+                else if ( action == "Cancel" ) {
+                    
+                    msgPopup.showModal();
+
+                    var url = "/scheduler-delete-slot?start_time=" + start_time_st + 
+                        "&duration=" + duration + 
+                        "&name=" + name + 
+                        "&address=" + address;
+
+                    axios.get(url)
+                    .then( response => { 
+                        date_st = start_time_st.slice(0, 10);
+                        removeEvents(date_st);
+                        getAvailableSlots(date_st);
+                    });
+                }
+            }
+        });
+
+        const durationInput = document.getElementById('requested_duration');
+        // const durationInput = document.querySelector('input[name="requested_duration"]');
+        durationInput.addEventListener('change', function() {
+            if ( durationInput.value != "" ) {
+                populateCalendar();
+            }
+        });
+
+    </script>
+
+    <script>
+
+        const calendarEl = document.getElementById('calendar');
+        var calendar;
+
+        const nameInput = document.getElementById('name');
+        const addressInput = document.getElementById('address');
+        const dateInput = document.getElementById('requested_date');
+
+        function initFields() {
+            // window.selected_date = new Date().toISOString().slice(0, 10);
+            addressInput.value = "575 St Clarens Ave, Toronto, ON"             
+            google.maps.event.addDomListener(window, 'load', initAutocomplete);
+            
+            showCalendar(); 
+
+            const nextButton = document.querySelector('.fc-next-button');
+            nextButton.addEventListener('click', function() {            
+                if ( durationInput.value != "" ) {
+                    populateCalendar();
+                }
+            });
+        }
+
+        function populateCalendar() {                   
+            const dateNodes = document.querySelectorAll(`[data-date]`);
+            const dates = new Set();
+            dateNodes.forEach(n => dates.add(n.attributes['data-date'].value));
+            dates.forEach(d => getBookedSlots(d, nameInput.value));
+            msgPopup.close();
+        }
+
+        function initAutocomplete() {
+            const address = document.getElementById('address');
+            const autocomplete = new google.maps.places.Autocomplete(address);
+            autocomplete.setFields(['address_components', 'geometry', 'formatted_address']);
+            autocomplete.addListener('place_changed', () => {
+                const place = autocomplete.getPlace();
+                if (!place.geometry) {
+                    console.log("No details for input");
+                    return;
+                }
+                console.log(place.formatted_address);
+            });
+        }
+
+        function showCalendar() {
+
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                height: 300,
+                initialView: 'dayGridWeek',
+                weekends: false,
+                selectable: true,
+                eventTimeFormat: {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                },
+                displayEventEnd: true,
+                events: [],      
+                eventClick: function(info) {
+                    
+                    // info.el.style.border = '2px solid red';
+
+                    tz_offset = new Date().getTimezoneOffset() * 60000;
+                    local_time = new Date(info.event.start.getTime() - tz_offset);
+                    start_time_st = local_time.toISOString().slice(0, -5).replace('T', ' ');
+
+                    if ( info.event.title == nameInput.value ) {
+                        action = "Cancel";
+                    }
+                    else {
+                        action = "Book";
+                    }
+
+                    document.getElementById('dialog-action').textContent = action;
+
+                    // addr = addressInput.value.replace(', Toronto, ON', '').replace(', Canada', '');
+                    // document.getElementById('dialog-title').innerHTML = nameInput.value + "<br/>" + addr + "<br/>";
+                    document.getElementById('dialog-title').innerHTML = action + " appointment?";
+                    document.getElementById('dialog-text').innerHTML = durationInput.value + " mins at " + start_time_st.slice(11, 16) + " on " + start_time_st.slice(0, 10);
+                    document.getElementById('dialog-name').textContent = nameInput.value;
+                    document.getElementById('dialog-address').textContent = addressInput.value;
+                    document.getElementById('dialog-start').textContent = start_time_st;
+                    document.getElementById('dialog-duration').textContent = durationInput.value;
+
+                    bookDialog.showModal();
+                },
+                // select: function(selectionInfo) {
+                    // const parent = document.querySelectorAll(`[data-date="${selectionInfo.startStr}"]`)[1];
+                    // const child = parent.querySelector('.fc-daygrid-bg-harness');
+                    // child.style.border = '2px solid blue';
+                    // // child.innerText = 'Checking appointments...';
+                    // window.selected_date = selectionInfo.startStr;
+                    // document.getElementById('response').innerHTML = '';                        
+                    // getBookedSlots(selectionInfo.startStr, nameInput.value);
+                // }
+            });
+
+            calendar.render();
+        }
+        
+    </script>
+  
+{% endblock %}
+
+
+

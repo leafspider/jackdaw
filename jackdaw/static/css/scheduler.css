@@ -1,0 +1,53 @@
+.dialog-field { display:none; }
+#response { font-size: larger;}
+.map-label {
+  min-width:200px;
+  color: white;
+  font-size: 15px;
+  font-weight: bold;
+  text-shadow:
+      -1px -1px 0 #000,  
+      1px -1px 0 #000,
+      -1px  1px 0 #000,
+      1px  1px 0 #000;
+}
+
+.custom-radio {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 16px;
+}
+.custom-radio input[type="radio"] {
+  opacity: 0;         /* Hide default radio */
+  position: absolute;
+}
+.indicator {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #51c0a8;
+  border-radius: 50%;
+  margin-right: 8px;
+  background: #fff;
+  transition: border 0.2s;
+  position: relative;
+}
+/* Show indicator for checked state */
+.custom-radio input[type="radio"]:checked + .indicator {
+  border-color: #2196F3;
+}
+.custom-radio input[type="radio"]:checked + .indicator::after {
+  content: "";
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #2196F3;
+  position: absolute;
+  top: 4px;
+  left: 4px;
+}
+/* Add keyboard accessibility styling */
+.custom-radio input[type="radio"]:focus + .indicator {
+  box-shadow: 0 0 2px 2px #a0e7d7;
+}

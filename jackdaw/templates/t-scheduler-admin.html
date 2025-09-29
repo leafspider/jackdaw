@@ -1,0 +1,228 @@
+{% extends 't-base.html' %}
+
+{% block content %}
+
+    <div id="results">
+
+        <table style="width:100%;">
+            <tr>
+                <td style="width:50%">
+                    <div id="weekCalendar" style="width:100%"></div>
+                </td>
+            </tr>
+            <tr>
+                <td style="width:50%">
+                    <div id="dayCalendar" style="width:100%;"></div>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <br/>
+                    <div id="map" style="height:400px;width:100%"></div>
+                </td>          
+            </tr>
+        </table>
+            
+    </div>
+  
+    <script src="https://maps.googleapis.com/maps/api/js?key={{API_KEY}}&libraries=geometry,places&callback=initFields" defer></script>
+    <script src='/static/js/fullcalendar.min.js'></script>
+    <script src='/static/js/scheduler.js'></script>
+    <link href='/static/css/scheduler.css' rel='stylesheet'/>
+  
+    <script>
+        async function initFields() {
+            
+            const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
+
+            today = new Date().setHours(0,0,0,0);
+            window.selected_date = new Date(today).toISOString().slice(0, 10);
+
+            showWeek();
+            
+            // const nextButton = document.querySelector('.fc-next-button');
+            // nextButton.addEventListener('click', function() {
+            //     populateCalendar();
+            // });
+
+            populateCalendar();      
+        }
+
+        function populateCalendar() {   
+            getAllBookedSlots();
+        }
+
+        const weekEl = document.getElementById('weekCalendar');
+        var weekCalendar;
+
+        function showWeek() {
+
+            weekCalendar = new FullCalendar.Calendar(weekEl, {
+                height: 300,
+                initialView: 'dayGridWeek',
+                weekends: false,
+                selectable: true,
+                eventTimeFormat: {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                },
+                displayEventEnd: true,
+                events: [],      
+                eventClick: function(info) {
+                    // info.el.style.border = '2px solid red';
+                    // start_time_st = info.event.start.toISOString().slice(0, -5).replace('T', ' ');
+                },
+                select: function(selectionInfo) {  
+
+                    today = new Date().setHours(0,0,0,0);
+                    the_time = new Date(selectionInfo.startStr + 'T00:00:00').getTime();
+                    if ( the_time < today ) { return; }         // Forget the past
+
+                    showDay(selectionInfo.startStr);
+                    for(slot of window.allSlots) {
+                        the_event = {
+                            title: slot.name + " : " + slot.address,
+                            start: slot.start_time,
+                            end: slot.end_time,
+                            allDay: false
+                        }
+                        dayCalendar.addEvent(the_event);
+                    }
+                    // calendar.unselect();
+                    window.selected_date = selectionInfo.startStr;
+                }
+            });
+
+            weekCalendar.render();
+        }
+
+        const dayEl = document.getElementById('dayCalendar');
+        var dayCalendar;
+
+        function showDay(date_st) {
+
+            dayCalendar = new FullCalendar.Calendar(dayEl, {
+                height: '300',
+                initialView: 'dayGridDay',
+                initialDate: date_st,
+                weekends: false,
+                selectable: true,
+                eventTimeFormat: {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                },
+                headerToolbar: {
+                    right: 'prev,next',
+                    center: 'title',
+                    left: '' // no other views to toggle to
+                },
+                displayEventEnd: true,
+                events: [],      
+                eventClick: function(info) {
+                    
+                    // info.el.style.border = '2px solid red';
+                    // start_time_st = info.event.start.toISOString().slice(0, -5).replace('T', ' ');
+
+                    title = info.event.title;
+                    console.log(title);
+                    addr = title.split(" : ")[1];
+                    var url = "https://www.google.com/maps/search/?api=1&query=" + addr;
+                    window.open(url, '_blank');
+                },
+                select: function(selectionInfo) {  
+
+                    // today = new Date().setHours(0,0,0,0);
+                    // the_time = new Date(selectionInfo.startStr + 'T00:00:00').getTime();
+                    // if ( the_time < today ) {                        
+                    //     // console.log("Forget the past." );                        
+                    //     return; 
+                    // }
+
+                    // removeEvents(selectionInfo.startStr);                  
+                    // if ( 
+                    // getAllBookedSlots(selectionInfo.startStr, true)
+                    // populateCalendar();
+                    // showMap(selectionInfo.startStr);
+                    // }
+                    // calendar.unselect();
+                    // window.selected_date = selectionInfo.startStr;
+                }
+            });
+            
+            showMap(date_st);
+
+            dayCalendar.render();
+        }
+
+        async function showMap(the_date) {
+            
+            if ( the_date == null) { the_date = window.selected_date }
+
+            var url = "/scheduler-directions?date=" + the_date;
+
+            axios.get(url)
+            .then( function (response) {
+
+                var data = response.data;
+                var encodedPolyline = data.routes[0].polyline.encodedPolyline
+                var decodedPath = google.maps.geometry.encoding.decodePath(encodedPolyline);    // Decode into LatLng array
+
+                var map = new google.maps.Map(document.getElementById('map'), {         // Create map centered on first point
+                // var map = new Map(document.getElementById('map'), {         // Create map centered on first point
+                    zoom: 14,
+                    center: decodedPath[0],
+                    mapId: 'YOUR_MAP_ID'
+                });
+
+                var routePolyline = new google.maps.Polyline({
+                    path: decodedPath,
+                    geodesic: true,
+                    strokeColor: '#FF0000',
+                    strokeOpacity: 1.0,
+                    strokeWeight: 4
+                });
+
+                routePolyline.setMap(map);
+                
+                if ( data.routes.length > 0 ) {
+                    data.routes[0].legs.forEach(function(leg) {     // Add markers
+
+                        // const pin = new google.maps.marker.PinElement({
+                        //     // Optional customization, e.g. color: '#FF0000'
+                        // });
+
+                        // const label = document.createElement('div');
+                        // label.className = 'map-label';
+                        // label.textContent = (leg.endLocation.nad[0] === 'End') ? '*' : 
+                        //     '' + (data.routes[0].legs.indexOf(leg) + 1) + ') ' + leg.endLocation.nad[0];
+                                                
+                        // label.appendChild(pin.element);
+
+                        var endMarker = new google.maps.Marker({
+                        // const endMarker = new google.maps.marker.AdvancedMarkerElement({
+                            position: { lat: leg.endLocation.latLng.latitude, lng: leg.endLocation.latLng.longitude },
+                            map: map,
+                            // content: label,
+                            label: {
+                                color: "blue",
+                                fontSize:"15px",
+                                fontWeight:"bold",
+                                text: (leg.endLocation.nad[0] === 'End') ? 'O' : 
+                                    '' + (data.routes[0].legs.indexOf(leg) + 1) + ') ' + leg.endLocation.nad[0],
+                                // textShadow: "-1px -1px 0 #000, 1px -1px 0 #000, -1px  1px 0 #000, 1px  1px 0 #000",
+                                // class: 'map-label'
+                            }
+                        });
+                    });
+                }
+            });
+        }
+
+    </script>
+  
+{% endblock %}
+
+
+

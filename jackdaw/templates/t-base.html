@@ -1,0 +1,38 @@
+<html>
+    <head>
+        <title>Leafspider Jackdaw</title>
+        <link rel="icon" type="image/x-icon" href="/static/img/logo.png"/>
+        <link href='/static/css/style.css?bob' rel="stylesheet" type="text/css" ></link>
+        <!-- <link href='https://code.highcharts.com/dashboards/css/datagrid.css' rel="stylesheet" type="text/css" ></link> -->
+        <script src='/static/js/jquery.min.js'></script>
+        <!-- <script src="https://code.highcharts.com/highcharts.js"></script> -->
+        <!-- <script src="https://code.highcharts.com/dashboards/datagrid.js"></script> -->
+        <!--script src='/static/js/gray.js'></script-->
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <script></script>
+    </head>
+
+    <body class="{{flow}}-bg">
+
+		<div class="ls-header">	
+			<a class="ls-header-link" href="https://leafspider.com">            
+				<div class="ls-header-title" style="background-image:url('static/img/logo.png');"></div>
+				Leafspider | Jackdaw
+			</a>          
+		</div>
+        			
+        <div id="div-menu">
+            <table>
+                <tr>
+                    <td><a href="/scheduler" class="menu-tab">Scheduler</a></td>
+                    <td><a href="/scheduler-admin" class="menu-tab">Admin</a></td>
+                </tr>
+            </table>
+        </div>
+
+        {% block content %}
+        {% endblock %}
+
+    </body>
+
+</html>
