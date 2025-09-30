@@ -10,8 +10,6 @@ from datetime import date, datetime
 
 app = Flask(__name__)
 
-flow_host = os.getenv("FLOW_HOST")
-flow_port = os.getenv("FLOW_PORT")
 page_port = os.getenv("PAGE_PORT")
 
 scheduler = sc.Scheduler()
@@ -109,7 +107,7 @@ def scheduler_directions():
 
 def start_page_server():
 
-    print(0,'start_page_server', flow_host, flow_port, page_port)
+    print(0,'start_page_server', page_port)
     extra_files = [ os.path.join('templates', 't-base.html', 't-sparrow.html', 't-scientist.html'), os.path.join('static/css', 'style.css')]
     app.config['TEMPLATES_AUTO_RELOAD'] = True
     app.run(extra_files=extra_files, host="0.0.0.0", port=page_port, threaded=True)
